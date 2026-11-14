@@ -38,6 +38,22 @@ export function solidCheckFromRows(rows) {
   };
 }
 
+// Builds an isSolid(tileX, tileY) function from objects that have a
+// footprint: { tileX, tileY, widthTiles, heightTiles, solid }.
+// Objects with solid: false do not block movement.
+export function solidCheckFromFootprints(objects) {
+  const solidTiles = new Set();
+  for (const object of objects) {
+    if (!object.solid) continue;
+    for (let y = object.tileY; y < object.tileY + object.heightTiles; y++) {
+      for (let x = object.tileX; x < object.tileX + object.widthTiles; x++) {
+        solidTiles.add(`${x},${y}`);
+      }
+    }
+  }
+  return (tileX, tileY) => solidTiles.has(`${tileX},${tileY}`);
+}
+
 // True if the collision box of a character standing at (x, y) overlaps a
 // solid tile.
 export function bodyHitsSolid(x, y, isSolid) {

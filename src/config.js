@@ -14,6 +14,13 @@ export const BODY_HEIGHT = 8;
 
 export const PLAYER_SPEED = 64; // Pixels per second (4 tiles).
 
+// How close (in pixels) the player must be to an object to interact with it.
+// Standing flush against an object is 4-7 px away, so 10 leaves a little slack.
+export const INTERACT_RANGE = 10;
+
+// UI is drawn above everything in the world.
+export const UI_DEPTH = 1000;
+
 // Palette from plan.md section 9.2.
 export const PALETTE = {
   deepNavy: 0x172333, // Outlines and shadows
