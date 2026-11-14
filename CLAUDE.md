@@ -27,6 +27,7 @@ Claude is the **primary implementation AI** and owns the codebase. Gemini review
 - Do not replace Phaser or introduce dependencies without approval.
 - Internal resolution 320 × 240, 16 × 16 tiles, 16 × 24 character frames, nearest-neighbour filtering, integer scaling.
 - Colours come from the palette in `src/config.js` (`plan.md` §9.2). Amber is for interaction/important information; red is for deviations only.
+- All on-screen text is drawn with the hand-made pixel font in `src/ui/pixelFont.js`, through `addText` in `src/ui/text.js`. It covers printable ASCII only (no curly quotes, long dashes, or accents); `tests/font.test.js` checks the case text.
 - Cases are authored as data; conditions and effects refer to stable IDs, never display text.
 - Keep code modular and beginner-readable. Systems must not depend on each other's internals.
 - Prefer a small patch over a large rewrite.

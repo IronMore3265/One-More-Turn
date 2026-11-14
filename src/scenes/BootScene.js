@@ -4,6 +4,14 @@ import {
   CHARACTER_HEIGHT,
   PALETTE,
 } from '../config.js';
+import {
+  FONT_KEY,
+  FONT_CHARS,
+  GLYPHS,
+  GLYPHS_PER_ROW,
+  CELL_WIDTH,
+  CELL_HEIGHT,
+} from '../ui/pixelFont.js';
 
 // Loads assets and prepares global configuration.
 //
@@ -20,7 +28,41 @@ export default class BootScene extends Phaser.Scene {
     this.createAuditor();
     this.createProps();
     this.createUi();
+    this.createFont();
     this.scene.start('CaseScene');
+  }
+
+  // Builds the pixel font (see ui/pixelFont.js): draws every glyph into one
+  // texture, laid out in a grid, then tells Phaser where each character is.
+  createFont() {
+    const sheetWidth = GLYPHS_PER_ROW * CELL_WIDTH;
+    const sheetHeight = Math.ceil(GLYPHS.length / GLYPHS_PER_ROW) * CELL_HEIGHT;
+
+    this.makeTexture(FONT_KEY, sheetWidth, sheetHeight, (g) => {
+      // White pixels, so each piece of text can be tinted to any colour.
+      g.fillStyle(0xffffff);
+      GLYPHS.forEach((glyph, index) => {
+        const cellX = (index % GLYPHS_PER_ROW) * CELL_WIDTH;
+        const cellY = Math.floor(index / GLYPHS_PER_ROW) * CELL_HEIGHT;
+        glyph.rows.forEach((row, y) => {
+          [...row].forEach((pixel, x) => {
+            if (pixel === '#') g.fillRect(cellX + x, cellY + y, 1, 1);
+          });
+        });
+      });
+    });
+
+    const fontData = Phaser.GameObjects.RetroFont.Parse(this, {
+      image: FONT_KEY,
+      width: CELL_WIDTH,
+      height: CELL_HEIGHT,
+      chars: FONT_CHARS,
+      charsPerRow: GLYPHS_PER_ROW,
+      offset: { x: 0, y: 0 },
+      spacing: { x: 0, y: 0 },
+      lineSpacing: 0,
+    });
+    this.cache.bitmapFont.add(FONT_KEY, fontData);
   }
 
   // Draws a texture in code. draw(g) receives a Graphics object.

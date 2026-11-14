@@ -118,7 +118,7 @@ test('Case 001 has the five core interactables with unique IDs', () => {
   ]);
 });
 
-test('every Case 001 interactable sits on floor tiles and has prompt text', () => {
+test('every Case 001 interactable sits on floor tiles and has a prompt', () => {
   const wallAt = solidCheckFromRows(case001.map.rows);
   for (const item of case001.interactables) {
     for (let y = item.tileY; y < item.tileY + item.heightTiles; y++) {
@@ -127,7 +127,6 @@ test('every Case 001 interactable sits on floor tiles and has prompt text', () =
       }
     }
     assert.ok(item.name && item.verb && item.texture, `${item.id} is missing a field`);
-    assert.ok(item.description.length > 0, `${item.id} has no description`);
   }
 });
 

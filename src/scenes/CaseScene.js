@@ -1,5 +1,6 @@
-import { TILE_SIZE, PLAYER_SPEED, PALETTE, UI_DEPTH } from '../config.js';
+import { TILE_SIZE, PLAYER_SPEED, UI_DEPTH } from '../config.js';
 import case001 from '../data/cases/case001.js';
+import { createCaseState } from '../systems/CaseState.js';
 import {
   inputDirection,
   moveWithCollision,
@@ -7,11 +8,24 @@ import {
   solidCheckFromFootprints,
 } from '../systems/MovementSystem.js';
 import { findNearestInteractable } from '../systems/InteractionSystem.js';
+import {
+  startDialogue,
+  currentLine,
+  advanceDialogue,
+} from '../systems/DialogueSystem.js';
+import { notebookTabs } from '../systems/NotebookSystem.js';
 import InteractionPrompt from '../ui/InteractionPrompt.js';
+import DialogueBox from '../ui/DialogueBox.js';
+import NotebookPanel from '../ui/NotebookPanel.js';
 
 // If the browser stalls, one frame can report a very long delta. Capping it
 // keeps a single step small.
 const MAX_FRAME_MS = 50;
+
+// What the player is doing right now. Only one mode is active at a time.
+const MODE_EXPLORE = 'explore'; // Walking around and interacting.
+const MODE_DIALOGUE = 'dialogue'; // Reading a dialogue box.
+const MODE_NOTEBOOK = 'notebook'; // Looking at the notebook.
 
 // Loads a case map, actors, interactions, and case state.
 // For now it always loads Case 001.
@@ -22,6 +36,7 @@ export default class CaseScene extends Phaser.Scene {
 
   create() {
     this.caseData = case001;
+    this.caseState = createCaseState();
     const { rows, spawn } = this.caseData.map;
 
     this.drawRoom(rows);
@@ -44,22 +59,83 @@ export default class CaseScene extends Phaser.Scene {
     this.player = this.add.image(0, 0, 'auditor').setOrigin(0.5, 1);
     this.drawPlayer();
 
-    // The interactable currently in range (or null), its marker and prompt.
+    // The interactable currently in range (or null), and its marker.
     this.target = null;
     this.marker = this.add
       .image(0, 0, 'ui_marker')
       .setOrigin(0.5, 1)
       .setDepth(UI_DEPTH - 1)
       .setVisible(false);
+
     this.prompt = new InteractionPrompt(this);
+    this.dialogueBox = new DialogueBox(this);
+    this.notebook = new NotebookPanel(this);
+
+    this.mode = MODE_EXPLORE;
+    this.dialogue = null; // The dialogue session being read, if any.
 
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,E,SPACE');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,E,SPACE,ENTER,ESC,J');
   }
 
   update(time, delta) {
+    const pressed = this.readPresses();
+
+    if (this.mode === MODE_EXPLORE) {
+      this.updateExplore(delta, pressed);
+    } else if (this.mode === MODE_DIALOGUE) {
+      this.updateDialogue(pressed);
+    } else if (this.mode === MODE_NOTEBOOK) {
+      this.updateNotebook(pressed);
+    }
+  }
+
+  // Reads which keys were pressed this frame (a press, not a hold).
+  //
+  // Every key is checked on every frame, whatever the mode. A press that is
+  // never checked stays "pending", and would fire later at the wrong moment
+  // (for example, skipping the first line of the next dialogue).
+  readPresses() {
+    const justDown = Phaser.Input.Keyboard.JustDown;
+    const e = justDown(this.keys.E);
+    const space = justDown(this.keys.SPACE);
+    const enter = justDown(this.keys.ENTER);
+    const escape = justDown(this.keys.ESC);
+    const j = justDown(this.keys.J);
+    const left = justDown(this.cursors.left);
+    const a = justDown(this.keys.A);
+    const right = justDown(this.cursors.right);
+    const d = justDown(this.keys.D);
+
+    return {
+      interact: e || space,
+      advance: enter || e || space,
+      cancel: escape,
+      notebook: j,
+      left: left || a,
+      right: right || d,
+    };
+  }
+
+  // --- Explore mode -------------------------------------------------------
+
+  updateExplore(delta, pressed) {
     this.updateMovement(delta);
-    this.updateInteraction();
+
+    const target = findNearestInteractable(
+      this.playerPosition,
+      this.caseData.interactables
+    );
+    if (target !== this.target) {
+      this.target = target;
+      this.showTarget();
+    }
+
+    if (pressed.interact && this.target) {
+      this.onInteract(this.target);
+    } else if (pressed.notebook) {
+      this.openNotebook();
+    }
   }
 
   updateMovement(delta) {
@@ -82,29 +158,10 @@ export default class CaseScene extends Phaser.Scene {
     this.drawPlayer();
   }
 
-  updateInteraction() {
-    const target = findNearestInteractable(
-      this.playerPosition,
-      this.caseData.interactables
-    );
-    if (target !== this.target) {
-      this.target = target;
-      this.showTarget();
-    }
-
-    const pressed =
-      Phaser.Input.Keyboard.JustDown(this.keys.E) ||
-      Phaser.Input.Keyboard.JustDown(this.keys.SPACE);
-    if (pressed && this.target) {
-      this.onInteract(this.target);
-    }
-  }
-
   // Shows the marker and prompt for the current target, or hides them.
   showTarget() {
     if (!this.target) {
-      this.marker.setVisible(false);
-      this.prompt.hide();
+      this.hideTarget();
       return;
     }
 
@@ -117,12 +174,71 @@ export default class CaseScene extends Phaser.Scene {
     this.prompt.show(`E  ${this.target.verb} ${this.target.name.toLowerCase()}`);
   }
 
-  // Called when the player interacts with an object.
-  // PLACEHOLDER: shows the description text. The dialogue and evidence
-  // systems will take over from here.
-  onInteract(interactable) {
-    this.prompt.show(interactable.description, PALETTE.warmCream);
+  hideTarget() {
+    this.marker.setVisible(false);
+    this.prompt.hide();
   }
+
+  // Called when the player interacts with an object: starts its dialogue.
+  onInteract(interactable) {
+    const session = startDialogue(
+      interactable.dialogue,
+      this.caseState,
+      this.caseData
+    );
+    if (!session) return;
+
+    this.dialogue = session;
+    this.mode = MODE_DIALOGUE;
+    this.hideTarget();
+    this.dialogueBox.show(currentLine(session));
+  }
+
+  // --- Dialogue mode ------------------------------------------------------
+
+  updateDialogue(pressed) {
+    if (pressed.cancel) {
+      this.closeDialogue();
+    } else if (pressed.advance) {
+      if (advanceDialogue(this.dialogue)) {
+        this.dialogueBox.show(currentLine(this.dialogue));
+      } else {
+        this.closeDialogue();
+      }
+    }
+  }
+
+  closeDialogue() {
+    this.dialogue = null;
+    this.dialogueBox.hide();
+    this.returnToExplore();
+  }
+
+  // --- Notebook mode ------------------------------------------------------
+
+  openNotebook() {
+    this.mode = MODE_NOTEBOOK;
+    this.hideTarget();
+    this.notebook.open(notebookTabs(this.caseData, this.caseState));
+  }
+
+  updateNotebook(pressed) {
+    if (pressed.cancel || pressed.notebook) {
+      this.notebook.close();
+      this.returnToExplore();
+    } else if (pressed.left) {
+      this.notebook.changeTab(-1);
+    } else if (pressed.right) {
+      this.notebook.changeTab(1);
+    }
+  }
+
+  returnToExplore() {
+    this.mode = MODE_EXPLORE;
+    this.showTarget();
+  }
+
+  // --- Drawing ------------------------------------------------------------
 
   drawPlayer() {
     const x = Math.round(this.playerPosition.x);

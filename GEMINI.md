@@ -20,6 +20,7 @@ Gemini is the **review and multimodal AI** for this project. Claude owns the cod
 - Do not propose silent changes to state contracts, replacing Phaser, or new dependencies; flag these for human approval.
 - Ask before changing design decisions that affect multiple cases.
 - Keep suggestions modular, minimal, and beginner-readable.
+- Write game text in plain ASCII only: straight quotes, a plain hyphen, no accents. The game's pixel font cannot draw anything else. About 50 characters fit on one line.
 - Never claim tests passed unless they were actually run.
 
 ## Review output format
