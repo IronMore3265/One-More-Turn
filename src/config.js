@@ -7,6 +7,13 @@ export const TILE_SIZE = 16;
 export const CHARACTER_WIDTH = 16;
 export const CHARACTER_HEIGHT = 24;
 
+// Characters collide with a small box at their feet, not the whole sprite,
+// so they can stand close in front of walls and props.
+export const BODY_WIDTH = 10;
+export const BODY_HEIGHT = 8;
+
+export const PLAYER_SPEED = 64; // Pixels per second (4 tiles).
+
 // Palette from plan.md section 9.2.
 export const PALETTE = {
   deepNavy: 0x172333, // Outlines and shadows

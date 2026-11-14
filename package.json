@@ -1,0 +1,8 @@
+{
+  "name": "one-more-turn",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
