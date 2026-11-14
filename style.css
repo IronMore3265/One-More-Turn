@@ -1,0 +1,24 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #101820; /* Black-blue from the plan.md palette */
+  overflow: hidden;
+}
+
+/* Centre the canvas. Its size is set by Phaser (see src/main.js). */
+#game {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
